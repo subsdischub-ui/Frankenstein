@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Frankenstein"
+description = "Laboratoire crypto de recherche, stratégie hybride et paper trading Binance explicable, sans ordre réel."
+version = "1.0.0"
+id = "artifacts/frankenstein"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22699
+
+[services.development]
+run = "pnpm --filter @workspace/frankenstein run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/frankenstein", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/frankenstein/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22699"
+BASE_PATH = "/"

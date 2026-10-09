@@ -1,0 +1,30 @@
+[Unit]
+Description=Frankenstein paper-only
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=frankenstein
+Group=frankenstein
+WorkingDirectory=/opt/frankenstein/app
+EnvironmentFile=/etc/frankenstein/vps.env
+ExecStart=/opt/frankenstein/node/bin/node /opt/frankenstein/app/server/index.mjs
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/frankenstein
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=4096
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

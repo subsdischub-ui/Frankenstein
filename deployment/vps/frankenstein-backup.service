@@ -1,0 +1,14 @@
+[Unit]
+Description=Sauvegarde privee Frankenstein (PostgreSQL et modeles)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=frankenstein
+Group=frankenstein
+ExecStart=/opt/frankenstein/tools/backup.sh
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/frankenstein

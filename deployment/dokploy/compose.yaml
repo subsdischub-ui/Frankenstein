@@ -1,0 +1,69 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deployment/dokploy/Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 25s
+    labels:
+      frankenstein.role: paper
+    # Aucun port publie sur le VPS : Dokploy/Traefik route vers ce port interne.
+    expose:
+      - "3000"
+    networks:
+      - private
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Configurer PUBLIC_ORIGIN HTTPS dans Dokploy}
+      DATABASE_URL: postgresql:///frankenstein
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: frankenstein
+      PGDATABASE: frankenstein
+      PGPASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
+      VPS_BIND_HOST: 0.0.0.0
+      VPS_TRUST_PROXY: "1"
+      VPS_ACCESS_FILE: /var/lib/frankenstein/access.json
+      VPS_DATA_DIR: /var/lib/frankenstein
+      VPS_OPERATOR_USERNAME: ${VPS_OPERATOR_USERNAME:-operateur}
+      VPS_OPERATOR_PASSWORD: ${VPS_OPERATOR_PASSWORD:?Configurer le mot de passe operateur dans Dokploy}
+    volumes:
+      - private_data:/var/lib/frankenstein
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/vps-health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+  db:
+    image: postgres:16-alpine
+    networks:
+      - private
+    restart: unless-stopped
+    labels:
+      frankenstein.role: database
+    environment:
+      POSTGRES_USER: frankenstein
+      POSTGRES_DB: frankenstein
+      POSTGRES_PASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../vps/schema.sql:/docker-entrypoint-initdb.d/001-frankenstein.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U frankenstein -d frankenstein"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+networks:
+  private: {}
+volumes:
+  private_data:
+    name: ${STACK_NAMESPACE:-frankenstein-paper}-private-data
+  postgres_data:
+    name: ${STACK_NAMESPACE:-frankenstein-paper}-postgres-data

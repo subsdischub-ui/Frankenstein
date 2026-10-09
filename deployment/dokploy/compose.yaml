@@ -41,7 +41,9 @@ services:
       retries: 3
       start_period: 45s
   db:
-    image: postgres:16-alpine
+    build:
+      context: ../..
+      dockerfile: deployment/dokploy/Postgres.Dockerfile
     networks:
       - private
     restart: unless-stopped
@@ -53,7 +55,6 @@ services:
       POSTGRES_PASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../vps/schema.sql:/docker-entrypoint-initdb.d/001-frankenstein.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U frankenstein -d frankenstein"]
       interval: 10s

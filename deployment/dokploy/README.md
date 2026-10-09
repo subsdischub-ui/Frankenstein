@@ -17,6 +17,7 @@ Créer un projet/service **Docker Compose** Frankenstein dans Dokploy :
 - Source : dépôt Git ci-dessus.
 - Branche : branche de livraison validée ; ne pas activer les déploiements d'expériences non approuvées.
 - Compose Path : `deployment/dokploy/compose.yaml`.
+- Compose Type : **Docker Compose**, pas **Stack** (le mode Stack ne construit pas les images).
 - Contexte de build : racine du dépôt ; défini dans Compose.
 - Dockerfile : `deployment/dokploy/Dockerfile`.
 
@@ -24,7 +25,7 @@ La configuration compile le backend et le frontend autonomes, sans les services 
 
 Le workflow GitHub `validate-dokploy.yml` exécute les tests, vérifie Compose et construit l'image sans publication. Il ne déclenche pas lui-même Dokploy. Sa présence n'implique pas qu'il ait déjà été exécuté ; consulter son résultat sur le commit à déployer.
 
-Le schéma initial crée seulement les quatre tables du laboratoire. Il est monté en lecture seule dans l'initialisation PostgreSQL. Il ne s'applique qu'à une base neuve ; les futurs changements de schéma nécessitent une migration explicite, pas une réinitialisation de volume.
+Le schéma initial crée seulement les quatre tables du laboratoire. Il est intégré à l'image PostgreSQL par `deployment/dokploy/Postgres.Dockerfile`, sans montage depuis le clone Git que Dokploy peut nettoyer. Il ne s'applique qu'à une base neuve ; les futurs changements de schéma nécessitent une migration explicite, pas une réinitialisation de volume.
 
 ## 2. Variables Dokploy
 

@@ -33,3 +33,5 @@ jobs:
         run: docker compose -f deployment/dokploy/compose.yaml config --quiet
       - name: Build deployable image without publishing
         run: docker build -f deployment/dokploy/Dockerfile -t frankenstein-paper:ci .
+      - name: Build PostgreSQL image with immutable initialization schema
+        run: docker build -f deployment/dokploy/Postgres.Dockerfile -t frankenstein-postgres:ci .

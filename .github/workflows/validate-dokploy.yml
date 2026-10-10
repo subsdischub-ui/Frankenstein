@@ -20,11 +20,12 @@ jobs:
           npm install --global pnpm@10.26.1
           pnpm install --frozen-lockfile --filter @workspace/api-server... --filter @workspace/frankenstein...
       - name: Test local auth and persistent bootstrap
-        run: node --test deployment/vps/tests/auth.test.mjs deployment/dokploy/tests/bootstrap.test.mjs
+        run: node --test deployment/vps/tests/auth.test.mjs deployment/dokploy/tests/bootstrap.test.mjs deployment/dokploy/tests/backup-runner.test.mjs
       - name: Check scripts
         run: |
-          sh -n deployment/dokploy/entrypoint.sh
-          bash -n deployment/dokploy/backup.sh deployment/dokploy/restore.sh
+          for script in deployment/dokploy/entrypoint.sh deployment/dokploy/backup-runner.sh deployment/dokploy/backup-daemon.sh; do sh -n "$script"; done
+          for script in deployment/dokploy/backup.sh deployment/dokploy/restore.sh; do bash -n "$script"; done
+          bash -n deployment/dokploy/tests/backup-integration.sh
       - name: Validate Compose with ephemeral placeholders
         env:
           PUBLIC_ORIGIN: https://ci.example.invalid
@@ -35,3 +36,9 @@ jobs:
         run: docker build -f deployment/dokploy/Dockerfile -t frankenstein-paper:ci .
       - name: Build PostgreSQL image with immutable initialization schema
         run: docker build -f deployment/dokploy/Postgres.Dockerfile -t frankenstein-postgres:ci .
+      - name: Build isolated automated backup image
+        run: docker build -f deployment/dokploy/Backup.Dockerfile -t frankenstein-backup:ci .
+      - name: Exercise backup and restore against disposable PostgreSQL
+        env:
+          BACKUP_TEST_PASSWORD: CI_ONLY_NOT_A_REAL_BACKUP_TEST_PASSWORD
+        run: bash deployment/dokploy/tests/backup-integration.sh

@@ -25,7 +25,7 @@ La configuration compile le backend et le frontend autonomes, sans les services 
 
 Le workflow GitHub `validate-dokploy.yml` exécute les tests, vérifie Compose et construit l'image sans publication. Il ne déclenche pas lui-même Dokploy. Sa présence n'implique pas qu'il ait déjà été exécuté ; consulter son résultat sur le commit à déployer.
 
-Le schéma initial crée seulement les quatre tables du laboratoire. Il est intégré à l'image PostgreSQL par `deployment/dokploy/Postgres.Dockerfile`, sans montage depuis le clone Git que Dokploy peut nettoyer. Il ne s'applique qu'à une base neuve ; les futurs changements de schéma nécessitent une migration explicite, pas une réinitialisation de volume.
+Le schéma initial crée seulement les quatre tables du laboratoire. Il est intégré à l'image PostgreSQL par `deployment/dokploy/Postgres.Dockerfile`, sans montage depuis le clone Git que Dokploy peut nettoyer. Il ne s'applique qu'à une base neuve ; les futurs changements de schéma nécessitent une migration explicite, pas une réinitialisation de volume. Le service `backup` est un conteneur séparé, sans port public ni accès au socket Docker.
 
 ## 2. Variables Dokploy
 
@@ -71,6 +71,7 @@ Deux volumes nommés, stables à chaque redeploiement :
 
 - `${STACK_NAMESPACE}-postgres-data` : portefeuille, événements et expériences.
 - `${STACK_NAMESPACE}-private-data` : hash du compte opérateur et modèles privés.
+- `/var/backups/frankenstein-dokploy` sur l'hôte : archives automatiques quotidiennes, conservées indépendamment des deux volumes applicatifs.
 
 Ne jamais utiliser `down -v`, supprimer les volumes ou changer STACK_NAMESPACE pour une simple mise à jour. Changer ce nom sélectionne de nouveaux volumes et peut donner l'impression que les données ont disparu.
 
@@ -134,19 +135,28 @@ Une mise à jour des règles de stratégie crée une nouvelle expérience ; ne p
 
 Un rollback applicatif ne restaure pas une migration DB. Contrôler la compatibilité du schéma ; ne jamais effectuer une migration destructive sans sauvegarde et confirmation.
 
-## 7. Sauvegarde et restauration
+## 7. Sauvegardes automatiques et restauration
 
-Depuis une session SSH autorisée sur le VPS, identifier les conteneurs dans Dokploy. Leurs noms ne sont pas les ports ni les noms de vos autres applications.
+Après déploiement de cette version, le service `backup` effectue une première sauvegarde dès son démarrage, puis une toutes les 24 heures. Après une erreur, il réessaie au bout de 15 minutes. Il attend que l'application et la base soient saines.
 
-Les scripts contrôlent les labels Frankenstein avant toute opération.
+Chaque archive contient le dump PostgreSQL (journal, portefeuille, décisions et expériences), le volume privé (modèles et fichier d'accès), les sommes SHA-256 et un marqueur `SUCCESS` écrit seulement après vérification. Le fichier d'accès contient un hash, pas le mot de passe en clair. Les archives sont créées sous `/var/backups/frankenstein-dokploy`, avec permissions privées `0700` pour les dossiers et `0600` pour les fichiers. Le volume privé de l'application est monté en lecture seule ; aucun socket Docker n'est donné au conteneur de sauvegarde.
+
+Le service apparaît dans Dokploy sous `backup`. Ses logs indiquent la réussite ou l'échec. Son healthcheck passe unhealthy si aucune sauvegarde vérifiée n'a réussi depuis 25 heures. Pour vérifier depuis le VPS :
+
+```sh
+find /var/backups/frankenstein-dokploy -mindepth 2 -maxdepth 2 \
+  -type f -name SUCCESS -print | sort | tail -5
+cd /var/backups/frankenstein-dokploy/DATE_UTC
+sha256sum -c SHA256SUMS
+```
+
+Les scripts contrôlent les labels Frankenstein avant toute sauvegarde ou restauration manuelle. Une sauvegarde manuelle reste possible depuis une session SSH autorisée :
 
 ```sh
 bash deployment/dokploy/backup.sh CONTENEUR_APP CONTENEUR_DB
 ```
 
-Le dump utilise le client PostgreSQL de la même famille que la base. Les modèles et access.json sont copiés séparément. La sauvegarde reste privée sous `/var/backups/frankenstein-dokploy` ; son hash d'accès est sensible.
-
-Programmer une sauvegarde quotidienne avec les noms de conteneurs réellement en cours, ou configurer les sauvegardes adaptées dans Dokploy. Ce paquet ne prétend pas qu'un job automatique est déjà configuré. Vérifier la restauration et conserver une copie chiffrée hors du VPS.
+Le conteneur dédié utilise le client PostgreSQL 16 de la même famille que la base. Il ne supprime pas les anciennes archives automatiquement : surveiller l'espace disque et décider de la rétention avant d'en supprimer. Ces archives résident sur le même VPS ; elles protègent d'une panne de service ou d'une erreur sur les volumes, pas d'une perte complète du VPS. Pour cette dernière protection, copier aussi des archives vérifiées vers un stockage externe chiffré.
 
 ```sh
 bash deployment/dokploy/restore.sh CONTENEUR_APP CONTENEUR_DB CHEMIN_SAUVEGARDE

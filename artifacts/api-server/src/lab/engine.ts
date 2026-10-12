@@ -5,6 +5,7 @@ import { candles, marketUniverse, depth, sweep, derivatives, bitcoinContext, typ
 import { readAccount, readMarket, saveMarket, mutateAccount, ownersToMonitor, workerLease } from "./store";
 import { logger } from "../lib/logger";
 import { scoreCandidate } from "./native-model";
+import { recordDiagnostic, type DiagnosticCheck } from "./diagnostics";
 import type { Candle, MarketAsset, Account } from "./types";
 
 export let heartbeat = new Date().toISOString();
@@ -58,12 +59,26 @@ async function monitor(a: Account): Promise<void> {
   }
 }
 
-async function processSignal(a: Account, asset: MarketAsset, h4: Candle[], m15: Candle[], instrument: Instrument, btcShock: number | null): Promise<void> {
+function setupStage(state: string, reason: string): string {
+  if (reason.includes("Historique insuffisant")) return "DATA";
+  if (reason.includes("déjà traitée")) return "DUPLICATE_BAR";
+  if (reason.includes("Alignement")) return "TREND_H4";
+  if (reason.includes("Compression")) return "COMPRESSION_H4";
+  if (reason.includes("Donchian")) return "BREAKOUT_H4";
+  if (reason.includes("expiré")) return "EXPIRED";
+  if (reason.includes("invalidée")) return "INVALIDATED";
+  if (state === "PULLBACK" || reason.includes("reprise M15")) return "RESUMPTION_M15";
+  return "PULLBACK_M15";
+}
+
+async function processSignal(a: Account, asset: MarketAsset, h4: Candle[], m15: Candle[], instrument: Instrument, btcShock: number | null): Promise<DiagnosticCheck> {
   const result = advanceSetup(a.setups[asset.symbol] || newSetup(), h4, m15);
   a.setups[asset.symbol] = result.setup;
-  if (!result.signal) return;
+  if (!result.signal) return { symbol: asset.symbol, stage: setupStage(result.setup.state, result.reasons[0] || ""),
+    status: result.reasons[0]?.includes("Historique insuffisant") ? "ERROR" : "WAITING", reasons: result.reasons };
   const id = `${asset.symbol}:${result.setup.signalBar}:${VERSION}`;
-  if (a.decisions.some(d => d.id === id)) return;
+  if (a.decisions.some(d => d.id === id))
+    return { symbol: asset.symbol, stage: "DUPLICATE_BAR", status: "WAITING", reasons: ["Signal déjà enregistré."] };
   const features = { ...result.features, volumeRatio: asset.volumeRatio!, relativeStrength: asset.relativeStrength!, ...(btcShock !== null ? { btcShock } : {}) };
   let available = true;
   try { Object.assign(features, await derivatives(asset.symbol)); } catch { available = false; }
@@ -96,6 +111,7 @@ async function processSignal(a: Account, asset: MarketAsset, h4: Candle[], m15: 
   } catch (e) { reasons.push((e as Error).message); }
   a.decisions.push(d);
   activity(a, d.accepted ? "ACCEPT" : "REJECT", `${asset.symbol} : ${reasons.join(" ")}`);
+  return { symbol: asset.symbol, stage: "DECISION", status: d.accepted ? "ACCEPTED" : "REJECTED", reasons };
 }
 
 export async function scan(): Promise<{ ok: boolean; message: string }> {
@@ -104,9 +120,10 @@ export async function scan(): Promise<{ ok: boolean; message: string }> {
   activeScan = (async () => {
     const lease = await workerLease();
     if (!lease) return { ok: false, message: "Un autre cycle est en cours." };
+    let owners: string[] = [];
     try {
       lastScanTime = Date.now();
-      const owners = await ownersToMonitor();
+      owners = await ownersToMonitor();
       // Exits are independent of scanner success: a ticker/ranking failure must not stop monitoring.
       for (const owner of owners) await mutateAccount(owner, monitor);
       const market = await marketUniverse();
@@ -122,13 +139,29 @@ export async function scan(): Promise<{ ok: boolean; message: string }> {
       }
       let btcShock: number | null = null;
       try { btcShock = await bitcoinContext(); } catch { /* Explicit null is handled by gate. */ }
-      for (const owner of owners) await mutateAccount(owner, async a => {
-        if (!a.running || a.halted) return;
+      for (const owner of owners) {
+        const checks = await mutateAccount(owner, async a => {
+        if (!a.running || a.halted) return null;
+        const checks: DiagnosticCheck[] = market.assets.filter(asset => asset.state === "FILTERED" || asset.state === "UNAVAILABLE")
+          .map(asset => ({ symbol: asset.symbol, stage: asset.state === "UNAVAILABLE" ? "DATA" :
+            asset.reasons.some(r => r.includes("Volume clôturé")) ? "VOLUME" : "RELATIVE_STRENGTH",
+            status: asset.state === "UNAVAILABLE" ? "ERROR" : "FILTERED", reasons: asset.reasons }));
         for (const asset of qualified) {
           const ctx = contexts.get(asset.symbol), instrument = market.instruments.find(i => i.symbol === asset.symbol);
-          if (ctx && instrument) await processSignal(a, asset, ctx.h4, ctx.m15, instrument, btcShock);
+          if (ctx && instrument) checks.push(await processSignal(a, asset, ctx.h4, ctx.m15, instrument, btcShock));
+          else checks.push({ symbol: asset.symbol, stage: "DATA", status: "ERROR",
+            reasons: ctx ? ["Instrument indisponible."] : asset.reasons });
         }
-      });
+        return checks;
+        });
+        if (!checks) continue;
+        // Persist separately so an observability failure cannot undo a virtual trade.
+        // A missing cycle will be visible through lastRecordedAt and the server log.
+        try {
+          await recordDiagnostic(owner, { time: new Date().toISOString(), baselineVersion: VERSION,
+            status: "healthy", ownerRunning: true, checks });
+        } catch (err) { logger.error({ err, owner }, "Lab diagnostic recording failed"); }
+      }
       let derivativeMessage = "Dérivés OI/funding disponibles.";
       try { await derivatives("BTCUSDT"); } catch (e) { derivativeMessage = `${(e as Error).message} Filtre requis absent → NO_TRADE.`; }
       const status = { assets: market.assets, status: "healthy" as const, lastScan: new Date().toISOString(),
@@ -140,6 +173,14 @@ export async function scan(): Promise<{ ok: boolean; message: string }> {
       const prev = await readMarket();
       await saveMarket({ ...prev, status: "unavailable", message: (e as Error).message });
       logger.warn({ err: e }, "Market scan unavailable");
+      for (const owner of owners) {
+        try {
+          await recordDiagnostic(owner, { time: new Date().toISOString(), baselineVersion: VERSION,
+            status: "unavailable", ownerRunning: true, checks: [
+              { symbol: "MARKET", stage: "MARKET", status: "ERROR", reasons: [(e as Error).message] },
+            ] });
+        } catch (err) { logger.error({ err, owner }, "Lab diagnostic recording failed"); }
+      }
       return { ok: false, message: (e as Error).message };
     } finally { await lease.release(); activeScan = null; }
   })();

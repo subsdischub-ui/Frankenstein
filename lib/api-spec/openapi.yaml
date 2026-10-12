@@ -130,6 +130,24 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ExportBundle" }
+  /frankenstein/diagnostics:
+    get:
+      operationId: getLabDiagnostics
+      responses:
+        "200":
+          description: Diagnostic privé du moteur paper, fenêtre mobile de 72 heures
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LabDiagnosticReport" }
+  /frankenstein/diagnostics/export:
+    get:
+      operationId: exportLabDiagnostics
+      responses:
+        "200":
+          description: Rapport privé et observations par cycle sur 72 heures
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LabDiagnosticReport" }
   /healthz:
     get:
       operationId: healthCheck
@@ -145,6 +163,55 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    DiagnosticCheck:
+      type: object
+      required: [symbol, stage, status, reasons]
+      properties:
+        symbol: { type: string }
+        stage: { type: string }
+        status: { type: string, enum: [FILTERED, WAITING, ERROR, SIGNAL, ACCEPTED, REJECTED] }
+        reasons: { type: array, items: { type: string } }
+    DiagnosticCycle:
+      type: object
+      required: [time, baselineVersion, status, ownerRunning, checks]
+      properties:
+        time: { type: string }
+        baselineVersion: { type: string }
+        status: { type: string, enum: [healthy, unavailable] }
+        ownerRunning: { type: boolean }
+        checks: { type: array, items: { $ref: "#/components/schemas/DiagnosticCheck" } }
+    DiagnosticBreakdown:
+      type: object
+      required: [label, count]
+      properties:
+        label: { type: string }
+        count: { type: integer }
+    DiagnosticWindow:
+      type: object
+      required: [cycles, observations, candidates, signals, accepted, rejected, errors, stages, reasons]
+      properties:
+        cycles: { type: integer }
+        observations: { type: integer }
+        candidates: { type: integer }
+        signals: { type: integer }
+        accepted: { type: integer }
+        rejected: { type: integer }
+        errors: { type: integer }
+        stages: { type: array, items: { $ref: "#/components/schemas/DiagnosticBreakdown" } }
+        reasons: { type: array, items: { $ref: "#/components/schemas/DiagnosticBreakdown" } }
+    LabDiagnosticReport:
+      type: object
+      required: [schemaVersion, generatedAt, baselineVersion, mode, firstRecordedAt, lastRecordedAt, last24h, last72h, cycles]
+      properties:
+        schemaVersion: { type: integer }
+        generatedAt: { type: string }
+        baselineVersion: { type: string }
+        mode: { type: string, enum: [paper] }
+        firstRecordedAt: { type: string, nullable: true }
+        lastRecordedAt: { type: string, nullable: true }
+        last24h: { $ref: "#/components/schemas/DiagnosticWindow" }
+        last72h: { $ref: "#/components/schemas/DiagnosticWindow" }
+        cycles: { type: array, items: { $ref: "#/components/schemas/DiagnosticCycle" } }
     ControlInput:
       type: object
       additionalProperties: false

@@ -19,8 +19,8 @@ jobs:
         run: |
           npm install --global pnpm@10.26.1
           pnpm install --frozen-lockfile --filter @workspace/api-server... --filter @workspace/frankenstein...
-      - name: Test local auth and persistent bootstrap
-        run: node --test deployment/vps/tests/auth.test.mjs deployment/dokploy/tests/bootstrap.test.mjs deployment/dokploy/tests/backup-runner.test.mjs
+      - name: Test local auth, diagnostics and persistent bootstrap
+        run: node --experimental-strip-types --test deployment/vps/tests/auth.test.mjs deployment/dokploy/tests/bootstrap.test.mjs deployment/dokploy/tests/backup-runner.test.mjs deployment/dokploy/tests/diagnostics.test.mjs
       - name: Check scripts
         run: |
           for script in deployment/dokploy/entrypoint.sh deployment/dokploy/backup-runner.sh deployment/dokploy/backup-daemon.sh; do sh -n "$script"; done

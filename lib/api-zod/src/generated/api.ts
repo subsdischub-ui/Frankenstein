@@ -464,6 +464,118 @@ export const ExportJournalResponse = zod.object({
 })
 
 
+export const GetLabDiagnosticsResponse = zod.object({
+  "schemaVersion": zod.number().int(),
+  "generatedAt": zod.string(),
+  "baselineVersion": zod.string(),
+  "mode": zod.enum(['paper']),
+  "firstRecordedAt": zod.string().nullable(),
+  "lastRecordedAt": zod.string().nullable(),
+  "last24h": zod.object({
+  "cycles": zod.number().int(),
+  "observations": zod.number().int(),
+  "candidates": zod.number().int(),
+  "signals": zod.number().int(),
+  "accepted": zod.number().int(),
+  "rejected": zod.number().int(),
+  "errors": zod.number().int(),
+  "stages": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+})),
+  "reasons": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+}))
+}),
+  "last72h": zod.object({
+  "cycles": zod.number().int(),
+  "observations": zod.number().int(),
+  "candidates": zod.number().int(),
+  "signals": zod.number().int(),
+  "accepted": zod.number().int(),
+  "rejected": zod.number().int(),
+  "errors": zod.number().int(),
+  "stages": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+})),
+  "reasons": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+}))
+}),
+  "cycles": zod.array(zod.object({
+  "time": zod.string(),
+  "baselineVersion": zod.string(),
+  "status": zod.enum(['healthy', 'unavailable']),
+  "ownerRunning": zod.boolean(),
+  "checks": zod.array(zod.object({
+  "symbol": zod.string(),
+  "stage": zod.string(),
+  "status": zod.enum(['FILTERED', 'WAITING', 'ERROR', 'SIGNAL', 'ACCEPTED', 'REJECTED']),
+  "reasons": zod.array(zod.string())
+}))
+}))
+})
+
+
+export const ExportLabDiagnosticsResponse = zod.object({
+  "schemaVersion": zod.number().int(),
+  "generatedAt": zod.string(),
+  "baselineVersion": zod.string(),
+  "mode": zod.enum(['paper']),
+  "firstRecordedAt": zod.string().nullable(),
+  "lastRecordedAt": zod.string().nullable(),
+  "last24h": zod.object({
+  "cycles": zod.number().int(),
+  "observations": zod.number().int(),
+  "candidates": zod.number().int(),
+  "signals": zod.number().int(),
+  "accepted": zod.number().int(),
+  "rejected": zod.number().int(),
+  "errors": zod.number().int(),
+  "stages": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+})),
+  "reasons": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+}))
+}),
+  "last72h": zod.object({
+  "cycles": zod.number().int(),
+  "observations": zod.number().int(),
+  "candidates": zod.number().int(),
+  "signals": zod.number().int(),
+  "accepted": zod.number().int(),
+  "rejected": zod.number().int(),
+  "errors": zod.number().int(),
+  "stages": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+})),
+  "reasons": zod.array(zod.object({
+  "label": zod.string(),
+  "count": zod.number().int()
+}))
+}),
+  "cycles": zod.array(zod.object({
+  "time": zod.string(),
+  "baselineVersion": zod.string(),
+  "status": zod.enum(['healthy', 'unavailable']),
+  "ownerRunning": zod.boolean(),
+  "checks": zod.array(zod.object({
+  "symbol": zod.string(),
+  "stage": zod.string(),
+  "status": zod.enum(['FILTERED', 'WAITING', 'ERROR', 'SIGNAL', 'ACCEPTED', 'REJECTED']),
+  "reasons": zod.array(zod.string())
+}))
+}))
+})
+
+
 /**
  * Returns server health status
  * @summary Health check

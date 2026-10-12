@@ -26,6 +26,7 @@ import type {
   Experiment,
   ExportBundle,
   HealthStatus,
+  LabDiagnosticReport,
   NativeModelInput,
   ProposalInput,
   ReplayInput,
@@ -795,6 +796,148 @@ export function useExportJournal<TData = Awaited<ReturnType<typeof exportJournal
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getExportJournalQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLabDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/frankenstein/diagnostics`
+}
+
+export const getLabDiagnostics = async ( options?: Parameters<typeof customFetch>[1]): Promise<LabDiagnosticReport> => {
+
+  return customFetch<LabDiagnosticReport>(getGetLabDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLabDiagnosticsQueryKey = () => {
+    return [
+    `/api/frankenstein/diagnostics`
+    ] as const;
+    }
+
+
+export const getGetLabDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof getLabDiagnostics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLabDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLabDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLabDiagnostics>>> = ({ signal }) => getLabDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLabDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLabDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof getLabDiagnostics>>>
+export type GetLabDiagnosticsQueryError = ErrorType<unknown>
+
+
+
+export function useGetLabDiagnostics<TData = Awaited<ReturnType<typeof getLabDiagnostics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLabDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLabDiagnosticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportLabDiagnosticsUrl = () => {
+
+
+
+
+  return `/api/frankenstein/diagnostics/export`
+}
+
+export const exportLabDiagnostics = async ( options?: Parameters<typeof customFetch>[1]): Promise<LabDiagnosticReport> => {
+
+  return customFetch<LabDiagnosticReport>(getExportLabDiagnosticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportLabDiagnosticsQueryKey = () => {
+    return [
+    `/api/frankenstein/diagnostics/export`
+    ] as const;
+    }
+
+
+export const getExportLabDiagnosticsQueryOptions = <TData = Awaited<ReturnType<typeof exportLabDiagnostics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportLabDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportLabDiagnosticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportLabDiagnostics>>> = ({ signal }) => exportLabDiagnostics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportLabDiagnostics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportLabDiagnosticsQueryResult = NonNullable<Awaited<ReturnType<typeof exportLabDiagnostics>>>
+export type ExportLabDiagnosticsQueryError = ErrorType<unknown>
+
+
+
+export function useExportLabDiagnostics<TData = Awaited<ReturnType<typeof exportLabDiagnostics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportLabDiagnostics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportLabDiagnosticsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

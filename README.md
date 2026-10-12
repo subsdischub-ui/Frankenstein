@@ -9,6 +9,7 @@ Les six revues adversariales du concept ont précédé sa construction. Elles on
 - Aucun compte ni clé Binance. **Aucun endpoint d'ordre réel**, aucun levier, aucun chemin live.
 - Paper long-only, compte personnel protégé par Clerk. Les visiteurs peuvent observer le scanner et exécuter une démonstration technique isolée.
 - PostgreSQL : états transactionnels, verrou par compte, worker unique, événements append-only, expériences persistées. Pause et arrêt bloquent les entrées, pas la surveillance des sorties.
+- Cockpit → « Parcours des scans » : compteurs privés 24 h/72 h et motifs par actif/cycle, export JSON des cycles des 72 dernières heures. Les observations commencent **après** le déploiement de cette fonction ; elles ne reconstituent pas les scans antérieurs.
 - Modèles XGBoost natifs importés en stockage privé, JSON validé, hash et schéma vérifiés, score shadow distinct. **Un candidat importé ne décide jamais d'un trade.** Retrait réversible au niveau de la stratégie : la baseline n'a jamais été remplacée, les fichiers/audits restent conservés.
 - Outils locaux Mac : collecte publique, entraînement XGBoost CPU `hist`, séparation temporelle purgée, calibration Platt et rapport OpenClaw lecture seule.
 
@@ -59,6 +60,8 @@ Le scanner prend au plus 30 paires USDT Spot actuellement liquides (20 M USDT de
 Tendance H4 EMA50/EMA200 ; compression numérique des quatre barres précédentes et Donchian20 excluant la barre de cassure. États : WATCH → ARMED → PULLBACK VWAP/RSI → CONFIRMED reprise M15, expiration/invalidation. Proxy CVD = `2*takerBuy-baseVolume`, sans prétendre identifier des baleines.
 
 Le portier exige OI/funding disponibles et contexte BTC frais. OI delta deux heures et funding >0,05 %/intervalle déclenchent un refus de surchauffe lorsque les deux seuils sont dépassés. Le live BTC détecte un range baissier 1 min >3×ATR, verrou de 30 min. Le replay n'a que du M15 : son proxy de choc BTC est **moins fidèle**, pas une preuve du portier 1 min.
+
+Le diagnostic compte des **observations** (un actif par cycle), pas des actifs distincts. Un refus « compression H4 » avant signal n'est pas une décision de trading : consulter les étapes et raisons du cockpit pour l'expliquer. Le rapport des 72 dernières heures est téléchargeable après connexion ; seules les 20 dernières fiches de cycle sont affichées à l'écran. La date du dernier enregistrement permet de détecter un diagnostic bloqué. L'enregistrement des observations est séparé de la transaction paper : s'il échoue, l'entrée virtuelle déjà traitée n'est pas annulée et le serveur émet une erreur. Aucun paramètre de la stratégie, aucun ordre réel et aucun accès OpenClaw n'en résultent.
 
 **Restriction observée sur cet hébergement : Binance Futures HTTP 451.** Spot fonctionne ; les filtres dérivés absents bloquent les entrées. Aucune donnée de remplacement inventée, aucun contournement régional. L'import permet la recherche si l'utilisateur dispose légalement d'un historique.
 

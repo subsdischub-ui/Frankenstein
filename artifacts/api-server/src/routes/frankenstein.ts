@@ -4,6 +4,7 @@ import {
   GetSnapshotResponse, ControlEngineBody, RunReplayBody, RunReplayResponse, CreateProposalBody,
   GetAuditsResponse, ListExperimentsResponse, ExportJournalResponse, ControlEngineResponse, ScanMarketResponse,
   ImportNativeModelBody,
+  GetLabDiagnosticsResponse, ExportLabDiagnosticsResponse,
 } from "@workspace/api-zod";
 import { scan, snapshot, trainingRows } from "../lab/engine";
 import { activity } from "../lab/portfolio";
@@ -12,6 +13,7 @@ import { runReplay } from "../lab/replay";
 import { AUDITS } from "../lab/audits";
 import { FEATURE_ORDER, VERSION, PARAMS } from "../lab/config";
 import { importModel } from "../lab/native-model";
+import { diagnosticReport } from "../lab/diagnostics";
 
 const router: IRouter = Router();
 const limits = new Map<string, number>();
@@ -37,6 +39,18 @@ router.use("/frankenstein", (req, res, next) => {
 });
 router.get("/frankenstein/snapshot", async (req, res): Promise<void> => {
   res.json(GetSnapshotResponse.parse(await snapshot(getAuth(req).userId)));
+});
+router.get("/frankenstein/diagnostics", async (req, res): Promise<void> => {
+  const owner = getAuth(req).userId;
+  if (!owner) { res.status(401).json({ error: "Connexion requise pour lire les diagnostics." }); return; }
+  res.set("Cache-Control", "no-store");
+  res.json(GetLabDiagnosticsResponse.parse(await diagnosticReport(owner)));
+});
+router.get("/frankenstein/diagnostics/export", async (req, res): Promise<void> => {
+  const owner = getAuth(req).userId;
+  if (!owner) { res.status(401).json({ error: "Connexion requise pour exporter les diagnostics." }); return; }
+  res.set("Cache-Control", "no-store");
+  res.json(ExportLabDiagnosticsResponse.parse(await diagnosticReport(owner, true)));
 });
 router.post("/frankenstein/control", async (req, res): Promise<void> => {
   const input = ControlEngineBody.safeParse(req.body);

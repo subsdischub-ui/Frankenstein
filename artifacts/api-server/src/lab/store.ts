@@ -48,7 +48,10 @@ export async function saveExperiment(owner: string, report: Experiment): Promise
   await pool.query("INSERT INTO lab_experiments(id,owner,report) VALUES($1,$2,$3)", [report.id, owner, JSON.stringify(report)]);
 }
 export async function auditRaw(owner: string): Promise<unknown[]> {
-  const { rows } = await pool.query("SELECT payload FROM lab_events WHERE owner=$1 ORDER BY time DESC LIMIT 10000", [owner]);
+  const { rows } = await pool.query(
+    "SELECT payload FROM lab_events WHERE owner=$1 AND payload->>'type' IS DISTINCT FROM 'SCAN_DIAGNOSTIC' ORDER BY time DESC LIMIT 10000",
+    [owner],
+  );
   return rows.map(r => r.payload);
 }
 // A session-level advisory lock ensures one market worker across concurrent API processes.

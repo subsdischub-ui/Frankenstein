@@ -5,6 +5,77 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type DiagnosticCheckStatus = typeof DiagnosticCheckStatus[keyof typeof DiagnosticCheckStatus];
+
+
+export const DiagnosticCheckStatus = {
+  FILTERED: 'FILTERED',
+  WAITING: 'WAITING',
+  ERROR: 'ERROR',
+  SIGNAL: 'SIGNAL',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export interface DiagnosticCheck {
+  symbol: string;
+  stage: string;
+  status: DiagnosticCheckStatus;
+  reasons: string[];
+}
+
+export type DiagnosticCycleStatus = typeof DiagnosticCycleStatus[keyof typeof DiagnosticCycleStatus];
+
+
+export const DiagnosticCycleStatus = {
+  healthy: 'healthy',
+  unavailable: 'unavailable',
+} as const;
+
+export interface DiagnosticCycle {
+  time: string;
+  baselineVersion: string;
+  status: DiagnosticCycleStatus;
+  ownerRunning: boolean;
+  checks: DiagnosticCheck[];
+}
+
+export interface DiagnosticBreakdown {
+  label: string;
+  count: number;
+}
+
+export interface DiagnosticWindow {
+  cycles: number;
+  observations: number;
+  candidates: number;
+  signals: number;
+  accepted: number;
+  rejected: number;
+  errors: number;
+  stages: DiagnosticBreakdown[];
+  reasons: DiagnosticBreakdown[];
+}
+
+export type LabDiagnosticReportMode = typeof LabDiagnosticReportMode[keyof typeof LabDiagnosticReportMode];
+
+
+export const LabDiagnosticReportMode = {
+  paper: 'paper',
+} as const;
+
+export interface LabDiagnosticReport {
+  schemaVersion: number;
+  generatedAt: string;
+  baselineVersion: string;
+  mode: LabDiagnosticReportMode;
+  firstRecordedAt: string | null;
+  lastRecordedAt: string | null;
+  last24h: DiagnosticWindow;
+  last72h: DiagnosticWindow;
+  cycles: DiagnosticCycle[];
+}
+
 export type ControlInputAction = typeof ControlInputAction[keyof typeof ControlInputAction];
 
 

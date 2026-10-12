@@ -1,0 +1,44 @@
+name: Validate Frankenstein paper delivery
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: ["dokploy-paper", "dokploy-paper-*", "release"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.13.0"
+      - name: Install pinned pnpm and dependencies
+        run: |
+          npm install --global pnpm@10.26.1
+          pnpm install --frozen-lockfile --filter @workspace/api-server... --filter @workspace/frankenstein...
+      - name: Test local auth, diagnostics and persistent bootstrap
+        run: node --experimental-strip-types --test deployment/vps/tests/auth.test.mjs deployment/dokploy/tests/bootstrap.test.mjs deployment/dokploy/tests/backup-runner.test.mjs deployment/dokploy/tests/diagnostics.test.mjs
+      - name: Check scripts
+        run: |
+          for script in deployment/dokploy/entrypoint.sh deployment/dokploy/backup-runner.sh deployment/dokploy/backup-daemon.sh; do sh -n "$script"; done
+          for script in deployment/dokploy/backup.sh deployment/dokploy/restore.sh; do bash -n "$script"; done
+          bash -n deployment/dokploy/tests/backup-integration.sh
+      - name: Validate Compose with ephemeral placeholders
+        env:
+          PUBLIC_ORIGIN: https://ci.example.invalid
+          VPS_OPERATOR_PASSWORD: CI_ONLY_NOT_A_REAL_OPERATOR_PASSWORD
+          FRANKENSTEIN_DB_PASSWORD: CI_ONLY_NOT_A_REAL_DATABASE_PASSWORD
+        run: docker compose -f deployment/dokploy/compose.yaml config --quiet
+      - name: Build deployable image without publishing
+        run: docker build -f deployment/dokploy/Dockerfile -t frankenstein-paper:ci .
+      - name: Build PostgreSQL image with immutable initialization schema
+        run: docker build -f deployment/dokploy/Postgres.Dockerfile -t frankenstein-postgres:ci .
+      - name: Build isolated automated backup image
+        run: docker build -f deployment/dokploy/Backup.Dockerfile -t frankenstein-backup:ci .
+      - name: Exercise backup and restore against disposable PostgreSQL
+        env:
+          BACKUP_TEST_PASSWORD: CI_ONLY_NOT_A_REAL_BACKUP_TEST_PASSWORD
+        run: bash deployment/dokploy/tests/backup-integration.sh

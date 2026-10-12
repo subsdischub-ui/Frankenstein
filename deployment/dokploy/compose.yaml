@@ -1,0 +1,113 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deployment/dokploy/Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 25s
+    labels:
+      frankenstein.role: paper
+    # Aucun port publie sur le VPS : Dokploy/Traefik route vers ce port interne.
+    expose:
+      - "3000"
+    networks:
+      - private
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Configurer PUBLIC_ORIGIN HTTPS dans Dokploy}
+      DATABASE_URL: postgresql:///frankenstein
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: frankenstein
+      PGDATABASE: frankenstein
+      PGPASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
+      VPS_BIND_HOST: 0.0.0.0
+      VPS_TRUST_PROXY: "1"
+      VPS_ACCESS_FILE: /var/lib/frankenstein/access.json
+      VPS_DATA_DIR: /var/lib/frankenstein
+      VPS_OPERATOR_USERNAME: ${VPS_OPERATOR_USERNAME:-operateur}
+      VPS_OPERATOR_PASSWORD: ${VPS_OPERATOR_PASSWORD:?Configurer le mot de passe operateur dans Dokploy}
+    volumes:
+      - private_data:/var/lib/frankenstein
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/vps-health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+  db:
+    build:
+      context: ../..
+      dockerfile: deployment/dokploy/Postgres.Dockerfile
+    networks:
+      - private
+    restart: unless-stopped
+    labels:
+      frankenstein.role: database
+    environment:
+      POSTGRES_USER: frankenstein
+      POSTGRES_DB: frankenstein
+      POSTGRES_PASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U frankenstein -d frankenstein"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+  backup:
+    build:
+      context: ../..
+      dockerfile: deployment/dokploy/Backup.Dockerfile
+    restart: unless-stopped
+    init: true
+    labels:
+      frankenstein.role: backup
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # Read the app's private volume (owned by UID 1000) without write access.
+      - DAC_READ_SEARCH
+    networks:
+      - private
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: frankenstein
+      PGDATABASE: frankenstein
+      PGPASSWORD: ${FRANKENSTEIN_DB_PASSWORD:?Configurer un mot de passe DB dans Dokploy}
+      BACKUP_INTERVAL_SECONDS: "86400"
+      BACKUP_RETRY_SECONDS: "900"
+      PRIVATE_DATA_DIR: /source/private
+    volumes:
+      - private_data:/source/private:ro
+      - /var/backups/frankenstein-dokploy:/backups
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "find /backups -mindepth 2 -maxdepth 2 -type f -name SUCCESS -mmin -1500 | grep -q ."]
+      interval: 15m
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+networks:
+  private: {}
+volumes:
+  private_data:
+    name: ${STACK_NAMESPACE:-frankenstein-paper}-private-data
+  postgres_data:
+    name: ${STACK_NAMESPACE:-frankenstein-paper}-postgres-data

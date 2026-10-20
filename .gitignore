@@ -3,6 +3,7 @@
 # compiled output
 dist
 dist-vps/
+/generated-artifacts/
 downloads/frankenstein-vps.tar.gz
 downloads/frankenstein-vps.zip
 tmp
